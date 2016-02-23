@@ -1,0 +1,4 @@
+Django
+django-push-notifications
+django-rest-swagger
+djangorestframework
