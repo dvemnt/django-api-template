@@ -10,9 +10,9 @@ from django.core.urlresolvers import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 
-from users.models import Verification
+from users.models import Confirmation
 
-VERSION = 'v1'
+VERSION = __name__.split('.')[1]
 CONTENT_TYPE = 'application/json'
 CONSTANTS = importlib.import_module('api.{}.constants'.format(VERSION))
 EMAIL_BACKEND = 'django.core.mail.backends.dummy.EmailBackend'
@@ -95,9 +95,7 @@ class RegistrationTest(CompositeDocstringTestCase):
             'email': 'test@mail.com', 'password': 'pass',
             'name': 'Test', 'surname': 'Test'
         }
-        get_user_model().objects.create_user(
-            email=payload['email'], password=payload['password']
-        )
+        get_user_model().objects.create(email=payload['email'], password='psw')
 
         response = self.client.post(self.url, data=payload)
 
@@ -116,16 +114,16 @@ class RegistrationTest(CompositeDocstringTestCase):
 
         user = get_user_model().objects.get(email=payload['email'])
 
-        self.assertTrue(Verification.objects.filter(user=user).exists())
+        self.assertTrue(Confirmation.objects.filter(user=user).exists())
         self.assertTrue(user.check_password(payload['password']))
 
 
 @test.override_settings(EMAIL_BACKEND=EMAIL_BACKEND)
-class VerificationTest(CompositeDocstringTestCase):
+class ConfirmationTest(CompositeDocstringTestCase):
 
-    """Test verification"""
+    """Test confirmation"""
 
-    url = reverse('api:{}:verification'.format(VERSION))
+    url = reverse('api:{}:confirmation'.format(VERSION))
     client = APIClient()
 
     def test_without_required_data(self):
@@ -136,23 +134,19 @@ class VerificationTest(CompositeDocstringTestCase):
 
     def test_with_wrong_code(self):
         """With wrong password."""
-        payload = {}
-        user = get_user_model().objects.create_user(
-            'test@mail.com', password='pass'
-        )
-        payload['code'] = Verification.objects.create(user=user).code + 'wrong'
+        payload = {'email': 'test@email.com'}
+        user = get_user_model().objects.create(payload['email'], password='pw')
+        payload['code'] = Confirmation.objects.create(user=user).code + 'wrong'
 
         response = self.client.post(self.url, data=payload)
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_success(self):
         """Success."""
         payload = {'email': 'test@email.com'}
-        user = get_user_model().objects.create_user(
-            payload['email'], password='pass'
-        )
-        payload['code'] = Verification.objects.create(user=user).code
+        user = get_user_model().objects.create(payload['email'], password='pw')
+        payload['code'] = Confirmation.objects.create(user=user).code
 
         response = self.client.post(self.url, data=payload)
         user.refresh_from_db()
@@ -162,11 +156,11 @@ class VerificationTest(CompositeDocstringTestCase):
 
 
 @test.override_settings(EMAIL_BACKEND=EMAIL_BACKEND)
-class ReverificationTest(CompositeDocstringTestCase):
+class ReconfirmationTest(CompositeDocstringTestCase):
 
-    """Test reverification"""
+    """Test reconfirmation"""
 
-    url = reverse('api:{}:reverification'.format(VERSION))
+    url = reverse('api:{}:reconfirmation'.format(VERSION))
     client = APIClient()
 
     def test_without_required_data(self):
@@ -179,7 +173,7 @@ class ReverificationTest(CompositeDocstringTestCase):
         """With not existing email."""
         response = self.client.post(self.url, data={'email': 'test@mail.com'})
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_success(self):
         """Success."""
@@ -191,7 +185,7 @@ class ReverificationTest(CompositeDocstringTestCase):
         response = self.client.post(self.url, data=payload)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(Verification.objects.filter(user=user).exists())
+        self.assertTrue(Confirmation.objects.filter(user=user).exists())
 
 
 @test.override_settings(EMAIL_BACKEND=EMAIL_BACKEND)
@@ -212,7 +206,7 @@ class RestorePasswordRequestTest(CompositeDocstringTestCase):
         """With not existing email."""
         response = self.client.post(self.url, data={'email': 'test@mail.com'})
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_success(self):
         """Success."""
@@ -224,7 +218,7 @@ class RestorePasswordRequestTest(CompositeDocstringTestCase):
         response = self.client.post(self.url, data=payload)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(Verification.objects.filter(user=user).exists())
+        self.assertTrue(Confirmation.objects.filter(user=user).exists())
 
 
 @test.override_settings(EMAIL_BACKEND=EMAIL_BACKEND)
@@ -243,18 +237,21 @@ class RestorePasswordChangeTest(CompositeDocstringTestCase):
 
     def test_with_wrong_code(self):
         """With wrong code."""
-        payload = {'password': 'pass', 'code': 'wrong'}
-        response = self.client.post(self.url, data=payload)
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_success(self):
-        """Success."""
-        payload = {'password': 'password'}
         user = get_user_model().objects.create_user(
             email='test@mail.com', password='pass'
         )
-        payload['code'] = Verification.objects.create(user=user).code
+        payload = {'email': user.email, 'password': 'pass', 'code': 'wrong'}
+        response = self.client.post(self.url, data=payload)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_success(self):
+        """Success."""
+        user = get_user_model().objects.create_user(
+            email='test@mail.com', password='pass'
+        )
+        payload = {'email': user.email, 'password': 'password'}
+        payload['code'] = Confirmation.objects.create(user=user).code
 
         response = self.client.post(self.url, data=payload)
         user.refresh_from_db()
@@ -289,7 +286,7 @@ class ChangePasswordTest(CompositeDocstringTestCase):
         payload = {'current_password': 'wrong', 'password': 'password'}
         response = self.client.post(self.url, data=payload)
 
-        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_success(self):
         """Success."""
@@ -321,7 +318,7 @@ class AuthenticationTest(CompositeDocstringTestCase):
 
         response = self.client.post(self.url, data=payload)
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_with_wrong_password(self):
         """With wrong password."""
@@ -333,7 +330,7 @@ class AuthenticationTest(CompositeDocstringTestCase):
 
         response = self.client.post(self.url, data=payload)
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_with_inactive_user(self):
         """With inactive user."""
@@ -344,7 +341,7 @@ class AuthenticationTest(CompositeDocstringTestCase):
 
         response = self.client.post(self.url, data=payload)
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_success(self):
         """Success."""

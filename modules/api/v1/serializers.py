@@ -2,20 +2,16 @@
 
 from django.contrib.auth import get_user_model
 from django.utils.translation import ugettext_lazy as _
-from rest_framework import serializers
+from rest_framework import serializers, exceptions
 from rest_framework.authtoken.models import Token
 
-from users.models import Verification
-from users.tasks import send_verification_email, send_restore_password_email
-
-from . import exceptions
+from users.models import Confirmation
+from users.tasks import send_confirmation_email, send_restore_password_email
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
 
-    """User serializer."""
-
-    NOT_UNIQUE_EMAIL = _('Email must be unique')
+    """Registration serializer."""
 
     password = serializers.CharField(write_only=True)
 
@@ -24,13 +20,9 @@ class RegistrationSerializer(serializers.ModelSerializer):
         fields = ('id', 'email', 'name', 'surname', 'password')
 
     def create(self, data):
-        """Create.
-
-        :param data: `dict` validated data.
-        """
         user = get_user_model().objects.create_user(**data)
-        verification = Verification.objects.create(user=user)
-        send_verification_email(verification)
+        confirmation = Confirmation.objects.create(user=user)
+        send_confirmation_email(confirmation)
         return user
 
 
@@ -38,66 +30,63 @@ class UserSerializer(serializers.ModelSerializer):
 
     """User serializer."""
 
-    NOT_UNIQUE_EMAIL = _('Email must be unique')
-
     class Meta:
         model = get_user_model()
         fields = ('id', 'email', 'name', 'surname')
 
 
-class VerificationSerializer(serializers.Serializer):
+class RegistrationConfirmationSerializer(serializers.Serializer):
 
-    """Verification serializer."""
+    """Registration confirmation serializer."""
 
     USER_NOT_FOUND = _('User not found')
     CODES_NOT_MATCH = _('Codes don\'t match')
 
+    email = serializers.EmailField(write_only=True)
     code = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        """Validate data.
-
-        :param value: `dict` data.
-        :returns: `dict` validated data.
-        """
         try:
-            verification = Verification.objects.get(code=data['code'])
-        except Verification.DoesNotExist:
-            raise exceptions.NotFoundRequestError(self.USER_NOT_FOUND)
+            user = get_user_model().objects.get(email=data['email'])
+        except get_user_model().DoesNotExist:
+            raise serializers.ValidationError(self.USER_NOT_FOUND)
 
-        if verification.code != data['code']:
-            raise exceptions.ConflictRequestError(self.CODES_NOT_MATCH)
+        try:
+            confirmation = user.confirmations.get(code=data['code'])
+        except Confirmation.DoesNotExist:
+            raise serializers.ValidationError(self.CODES_NOT_MATCH)
 
-        verification.user.is_active = True
-        verification.user.save()
-        verification.delete()
+        data['user'] = user
+        confirmation.delete()
 
         return data
 
+    def save(self):
+        user = self.validated_data['user']
+        user.is_active = True
+        user.save()
 
-class ReverificationSerializer(serializers.Serializer):
 
-    """Reverification serializer."""
+class ReconfirmationSerializer(serializers.Serializer):
+
+    """Reconfirmation serializer."""
 
     USER_NOT_FOUND = _('User not found')
 
     email = serializers.EmailField(write_only=True)
 
     def validate(self, data):
-        """Validate data.
-
-        :param value: `dict` data.
-        :returns: `dict` validated data.
-        """
         try:
-            user = get_user_model().objects.get(email=data['email'])
+            data['user'] = get_user_model().objects.get(email=data['email'])
         except get_user_model().DoesNotExist:
-            raise exceptions.NotFoundRequestError(self.USER_NOT_FOUND)
-
-        verification = Verification.objects.create(user=user)
-        send_verification_email(verification)
+            raise serializers.ValidationError(self.USER_NOT_FOUND)
 
         return data
+
+    def create(self, data):
+        confirmation = Confirmation.objects.create(user=data['user'])
+        send_confirmation_email(confirmation)
+        return confirmation
 
 
 class RestorePasswordRequestSerializer(serializers.Serializer):
@@ -109,20 +98,17 @@ class RestorePasswordRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(write_only=True)
 
     def validate(self, data):
-        """Validate data.
-
-        :param value: `dict` data.
-        :returns: `dict` validated data.
-        """
         try:
-            user = get_user_model().objects.get(email=data['email'])
+            data['user'] = get_user_model().objects.get(email=data['email'])
         except get_user_model().DoesNotExist:
-            raise exceptions.NotFoundRequestError(self.USER_NOT_FOUND)
-
-        verification = Verification.objects.create(user=user)
-        send_restore_password_email(verification)
+            raise serializers.ValidationError(self.USER_NOT_FOUND)
 
         return data
+
+    def create(self, data):
+        confirmation = Confirmation.objects.create(user=data['user'])
+        send_restore_password_email(confirmation)
+        return confirmation
 
 
 class RestorePasswordSerializer(serializers.Serializer):
@@ -132,28 +118,31 @@ class RestorePasswordSerializer(serializers.Serializer):
     USER_NOT_FOUND = _('User not found')
     CODES_NOT_MATCH = _('Codes don\'t match')
 
+    email = serializers.EmailField(write_only=True)
     code = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        """Validate data.
-
-        :param value: `dict` data.
-        :returns: `dict` validated data.
-        """
         try:
-            verification = Verification.objects.get(code=data['code'])
-        except Verification.DoesNotExist:
-            raise exceptions.NotFoundRequestError(self.USER_NOT_FOUND)
+            user = get_user_model().objects.get(email=data['email'])
+        except get_user_model().DoesNotExist:
+            raise serializers.ValidationError(self.USER_NOT_FOUND)
 
-        if verification.code != data['code']:
-            raise exceptions.ConflictRequestError(self.CODES_NOT_MATCH)
+        try:
+            confirmation = user.confirmations.get(code=data['code'])
+        except Confirmation.DoesNotExist:
+            raise serializers.ValidationError(self.CODES_NOT_MATCH)
 
-        verification.user.set_password(data['password'])
-        verification.user.save()
-        verification.delete()
+        data['user'] = user
+        confirmation.delete()
 
         return data
+
+    def save(self):
+        user = self.validated_data['user']
+
+        user.set_password(self.validated_data['password'])
+        user.save()
 
 
 class ChangePasswordSerializer(serializers.ModelSerializer):
@@ -170,20 +159,10 @@ class ChangePasswordSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
     def validate_current_password(self, value):
-        """Validate current password.
-
-        :param value: `str` password.
-        :returns: `str` validated value.
-        """
         if not self.instance.check_password(value):
-            raise exceptions.ConflictRequestError(self.PASSWORD_INCORRECT)
+            raise exceptions.ValidationError(self.PASSWORD_INCORRECT)
 
     def update(self, instance, data):
-        """Update instance.
-
-        :param instance: user instance.
-        :param data: `dict` validated data.
-        """
         instance.set_password(data['password'])
         instance.save()
         return instance
@@ -201,20 +180,15 @@ class AuthenticationSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
-        """Validate data.
-
-        :param value: `dict` data.
-        :returns: `dict` validated data.
-        """
         try:
             user = get_user_model().objects.get(email=data['email'])
             if not user.check_password(data['password']):
                 raise ValueError()
         except (get_user_model().DoesNotExist, ValueError):
-            raise exceptions.NotFoundRequestError(self.USER_NOT_FOUND)
+            raise exceptions.ValidationError(self.USER_NOT_FOUND)
 
         if not user.is_active:
-            raise exceptions.ForbiddenRequestError(self.USER_INACTIVE)
+            raise exceptions.ValidationError(self.USER_INACTIVE)
 
         data['token'] = Token.objects.get_or_create(user=user)[0].key
         return data

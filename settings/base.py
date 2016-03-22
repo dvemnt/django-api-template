@@ -147,6 +147,6 @@ DEFAULT_FROM_EMAIL = SERVER_EMAIL = None
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'api.v1.authentication.TokenAuthentication',
-    ),
+        'rest_framework.authentication.TokenAuthentication',
+    )
 }

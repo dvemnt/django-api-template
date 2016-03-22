@@ -15,23 +15,23 @@ def send_email(email, subject, message):
     )
 
 
-def send_verification_email(verification):
-    """Send verification email."""
+def send_confirmation_email(confirmation):
+    """Send confirmation email."""
     message = render_to_string(
-        emails.VERIFICATION['template'], {'code': verification.code}
+        emails.VERIFICATION['template'], {'code': confirmation.code}
     )
     send_email(
         subject=emails.VERIFICATION['subject'], message=message,
-        email=verification.user.email
+        email=confirmation.user.email
     )
 
 
-def send_restore_password_email(verification):
+def send_restore_password_email(confirmation):
     """Send email with instructions for restore password."""
     message = render_to_string(
-        emails.RESTORE_PASSWORD['template'], {'code': verification.code}
+        emails.RESTORE_PASSWORD['template'], {'code': confirmation.code}
     )
     send_email(
         subject=emails.RESTORE_PASSWORD['subject'], message=message,
-        email=verification.user.email
+        email=confirmation.user.email
     )

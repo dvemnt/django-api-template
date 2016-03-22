@@ -20,14 +20,14 @@ urlpatterns = [
         name='registration'
     ),
     url(
-        r'^verification$',
-        views.VerificationView.as_view(),
-        name='verification'
+        r'^confirmation$',
+        views.ConfirmationView.as_view(),
+        name='confirmation'
     ),
     url(
-        r'^reverification$',
-        views.ReverificationView.as_view(),
-        name='reverification'
+        r'^reconfirmation$',
+        views.ReconfirmationView.as_view(),
+        name='reconfirmation'
     ),
     url(
         r'^authentication$',
