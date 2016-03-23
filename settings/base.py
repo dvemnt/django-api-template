@@ -29,6 +29,7 @@ INSTALLED_APPS = (
     'rest_framework',
     'rest_framework.authtoken',
     'push_notifications',
+    'rest_framework_swagger',
 
     'users',
 )
@@ -97,6 +98,7 @@ LOGGING = {
         'file': {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
+            'filters': ['require_debug_false'],
             'filename': os.path.join(LOGS_DIR, 'exceptions.log'),
             'formatter': 'verbose'
         },
@@ -148,5 +150,11 @@ DEFAULT_FROM_EMAIL = SERVER_EMAIL = None
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     )
+}
+
+SWAGGER_SETTINGS = {
+    'is_authenticated': True,
+    'is_superuser': True,
 }

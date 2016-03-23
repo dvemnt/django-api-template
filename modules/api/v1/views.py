@@ -8,7 +8,7 @@ from push_notifications.api.rest_framework import (
 )
 from push_notifications.models import APNSDevice, GCMDevice
 
-from . import serializers
+from . import serializers, mixins
 
 
 class CustomAPNSDeviceAuthorizedViewSet(APNSDeviceAuthorizedViewSet):
@@ -55,14 +55,11 @@ class CustomGCMDeviceAuthorizedViewSet(GCMDeviceAuthorizedViewSet):
         return Response(self.serializer_class(device).data)
 
 
-class RegistrationView(APIView):
+class RegistrationView(mixins.SerializerViewMixin, APIView):
 
     """Registration."""
 
     serializer_class = serializers.RegistrationSerializer
-
-    def get_serializer_class(self):
-        return self.serializer_class
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -71,15 +68,12 @@ class RegistrationView(APIView):
         return Response(serializer.data, status.HTTP_201_CREATED)
 
 
-class ConfirmationView(APIView):
+class ConfirmationView(mixins.SerializerViewMixin, APIView):
 
     """Confirmation."""
 
     serializer_class = serializers.RegistrationConfirmationSerializer
 
-    def get_serializer_class(self):
-        return self.serializer_class
-
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -87,15 +81,12 @@ class ConfirmationView(APIView):
         return Response(serializer.data)
 
 
-class ReconfirmationView(APIView):
+class ReconfirmationView(mixins.SerializerViewMixin, APIView):
 
     """Reconfirmation."""
 
     serializer_class = serializers.ReconfirmationSerializer
 
-    def get_serializer_class(self):
-        return self.serializer_class
-
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -103,15 +94,12 @@ class ReconfirmationView(APIView):
         return Response(serializer.data)
 
 
-class RestorePasswordRequestView(APIView):
+class RestorePasswordRequestView(mixins.SerializerViewMixin, APIView):
 
     """Restore password request."""
 
     serializer_class = serializers.RestorePasswordRequestSerializer
 
-    def get_serializer_class(self):
-        return self.serializer_class
-
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -119,15 +107,12 @@ class RestorePasswordRequestView(APIView):
         return Response(serializer.data)
 
 
-class RestorePasswordView(APIView):
+class RestorePasswordView(mixins.SerializerViewMixin, APIView):
 
     """Restore password."""
 
     serializer_class = serializers.RestorePasswordSerializer
 
-    def get_serializer_class(self):
-        return self.serializer_class
-
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -135,14 +120,11 @@ class RestorePasswordView(APIView):
         return Response(serializer.data)
 
 
-class AuthenticationView(APIView):
+class AuthenticationView(mixins.SerializerViewMixin, APIView):
 
     """Authentication."""
 
     serializer_class = serializers.AuthenticationSerializer
-
-    def get_serializer_class(self):
-        return self.serializer_class
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -150,15 +132,12 @@ class AuthenticationView(APIView):
         return Response(serializer.data)
 
 
-class ProfileView(APIView):
+class ProfileView(mixins.SerializerViewMixin, APIView):
 
     """Profile."""
 
     serializer_class = serializers.UserSerializer
     permission_classes = (permissions.IsAuthenticated,)
-
-    def get_serializer_class(self):
-        return self.serializer_class
 
     def get(self, request):
         serializer = self.serializer_class(request.user)
@@ -173,15 +152,12 @@ class ProfileView(APIView):
         return Response(serializer.data)
 
 
-class ChangePasswordView(APIView):
+class ChangePasswordView(mixins.SerializerViewMixin, APIView):
 
     """Change password."""
 
     serializer_class = serializers.ChangePasswordSerializer
     permission_classes = (permissions.IsAuthenticated,)
-
-    def get_serializer_class(self):
-        return self.serializer_class
 
     def post(self, request):
         serializer = self.serializer_class(request.user, data=request.data)
